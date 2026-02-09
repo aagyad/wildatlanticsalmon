@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wild AtlanticSalmon Map</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+    <script src="Salmon_habitat.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100vw; height: 100vh; }
+        
+        /* SDG Logo Style */
+        .sdg-container {
+            position: absolute;
+            top: 25px;
+            left: 40px; /* Positioned to the right of zoom controls */
+            z-index: 1000;
+            width: 250px;
+            background: rgba(85, 119, 123, 0.9);
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            font-family: Arial, sans-serif;
+            font-size: 0.8em;
+            text-align: justify;
+        }
+        .sdg-logo {
+            width: 80px;
+            height: auto;
+            display: block;
+            margin: 0 auto 5px auto;
+        }
+
+        /* Flow Point Class */
+        .flow-point {
+            background: transparent;
+            border: none;
+        }
+
+        /* Info Title Style */
+        .info-title {
+            position: absolute;
+              top: 10px;
+            right: 20px;
+            z-index: 1000;
+            text-align: right;
+            pointer-events: none;
+        }
+        .info-title h1 {
+            font-size: 2.5em;
+            color: #0e89c3;
+            text-shadow: 2px 2px 0 #00008B, -1px -1px 0 #00008B, 1px -1px 0 #00008B, -1px 1px 0 #00008B, 1px 1px 0 #00008B;
+            margin: 0;
+        }
+        .info-title h3 {
+            font-size: 1.2em; /* Smaller font for the prefix */
+            color: #2795c8;
+            text-shadow: 1px 1px 0 #00008B;
+            margin: 0 0 5px 0;
+        }
+
+        /* Legend Style */
+        #legend-container {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(85, 119, 123, 0.9); /* Same as SDG container */
+            padding: 10px;
+            line-height: 18px;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            cursor: move;
+            font-family: Arial, sans-serif;
+            border: 2px solid white;
+        }
+        #legend-container i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 1;
+        }
+
+        #intro-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        .intro-content {
+            width: 900px;
+            height: 800px;
+            background-color: #003366;
+            -webkit-mask-image: url('fish-left-svgrepo-com.svg');
+            mask-image: url('fish-left-svgrepo-com.svg');
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px; /* Padding to keep content inside the fish shape */
+        }
+        .intro-content h1 { margin-top: 0; color: #89CFF0; }
+        .intro-content p { font-size: 1.2em; line-height: 1.6; }
+        .intro-content button {
+            background-color: #2ECC71;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .intro-content button:hover {
+            background-color: #27ae60;
+        }
+
+        /* Right Popup Icon */
+        #right-icon-container {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .icon-wrapper {
+            width: 60px;
+            height: auto;
+            animation: oscillate 2s infinite ease-in-out;
+        }
+
+        .wavy-arrow {
+            position: absolute;
+            right: 70px;
+            top: 10px;
+            width: 50px;
+            height: 30px;
+            pointer-events: none;
+        }
+
+        .status-text {
+            color: rgb(250, 250, 250);
+            font-family: Arial, sans-serif;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+            text-shadow: 0 0 3px black;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        @keyframes oscillate {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        #right-icon-container img {
+            width: 100%;
+            height: auto;
+            filter: invert(1) drop-shadow(0 0 5px rgba(255,255,255,0.5));
+        }
+
+        /* Info Modal */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 10001; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.7); 
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #dfe6ed;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            color: #333;
+            position: relative;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .modal-text {
+            text-align: justify;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 5px;
+            right: 15px;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Data Source */
+        .data-source {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 15px;
+            border-radius: 4px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+        }
+        .data-source a {
+            color: #89CFF0;
+            text-decoration: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- SDG Goal 14 Logo -->
+    <div class="sdg-container">
+        <img src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-14.jpg" alt="SDG 14" class="sdg-logo">
+        <div class="sdg-text">
+            SDG 14.2 aims to sustainably manage and protect marine and coastal ecosystems, strengthen their resilience, and take actions for its restoration order to achieve healthy and productive oceans. The web map is prepared to contribute to this goal.
+        </div>
+    </div>
+
+     <!-- Intro Popup -->
+    <div id="intro-popup">
+        <div class="intro-content">
+            <h1>Mapping The Wild Atlantic Salmon</h1>
+            <p>Welcome!<br>
+            This map visualizes the risk levels associated with salmon habitats across the<br> European region using data points.</p>
+            <button id="start-btn">Are you ready to check the status of the fish?</button>
+        </div>
+    </div>
+
+    <div class="info-title">
+       <h3>Mapping the habitat of</h3>
+       <h1>The Wild Atlantic Salmon</h1>
+   </div>
+
+   <!-- Draggable Legend -->
+   <div id="legend-container">
+       <i style="background:#34c5a7"></i> Low Risk<br>
+       <i style="background:#D6B36A"></i> Moderate Risk<br>
+       <i style="background:#b12f4a"></i> High Risk<br>
+       <i style="background:#2A2F3A"></i> Lost / Very High Risk<br>
+   </div>
+
+   <!-- Right Popup Icon -->
+   <div id="right-icon-container">
+       <!-- <div class="wavy-arrow">
+           <svg width="50" height="30" viewBox="0 0 50 30">
+               <defs>
+                   <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                       <polygon points="0 0, 10 3.5, 0 7" fill="white" />
+                   </marker>
+               </defs>
+               <path d="M0,15 Q12.5,0 25,15 T40,15" fill="none" stroke="white" stroke-width="2" marker-end="url(#arrowhead)" />
+           </svg>
+       </div> -->
+       <div class="status-text">Learn more..</div>
+       <div class="icon-wrapper">
+           <img src="salmon.svg" alt="Info">
+       </div>
+   </div>
+
+   <!-- Info Modal -->
+   <div id="info-modal" class="modal">
+       <div class="modal-content">
+           <span class="close">&times;</span>
+           <img src="salmon_real.jpg" alt="Wild Atlantic Salmon">
+           <div class="modal-text">
+               <p><strong>Wild salmon numbers are at crisis levels!</strong></p>
+               <p>Since 2006, the population of the fish has declined by 23%, marking it as "Near Threatened" in terms of global populations.</p>
+               <div style="text-align: center; margin: 15px 0;">
+                   <img src="graphics_two.png" alt="Decline in salmon count" style="max-width: 50%; height: auto; margin-bottom: 5px;">
+                   <div style="font-size: 0.9em; font-style: italic; color: #555;">Decline in salmon count</div>
+               </div>
+               <p>Atlantic salmon are in the 1% of highly migrating fish species with complex lifecycle that span both freshwater and marine environments making them vulnerable to the growing environmental pressure.</p>
+               <div style="text-align: center; margin: 15px 0;">
+                   <img src="graphics_one.png" alt="Salmon Lifecycle" style="max-width: 100%; height: auto;">
+               </div>
+               <p>Their decline signals broader environmental challenges as they serve as vital indicators of river and marine ecosystem health. Hence, this affects not just this species, but entire aquatic ecosystems and the communities that depend on them.</p>
+               <p>The major contributory factor to the decline in wild salmons are: barriers to migration, climate change, aqua culture impact and low marine survival.</p>
+           </div>
+       </div>
+   </div>
+
+   <!-- Data Source -->
+   <div class="data-source">
+       Data Source: NASCO Wild Atlantic Salmon Atlas | <a href="https://storymaps.arcgis.com/stories/4d2409f631064f9789580f3dfe458c05" target="_blank">View StoryMap</a>
+   </div>
+
+   <div id="map"></div>
+
+
+    <script>
+         // Intro Screen Logic
+    document.getElementById('start-btn').addEventListener('click', function() {
+        document.getElementById('intro-popup').style.display = 'none';
+    });
+
+    // Modal Logic
+    var modal = document.getElementById("info-modal");
+    var btn = document.getElementById("right-icon-container");
+    var span = document.getElementsByClassName("close")[0];
+
+    btn.onclick = function() {
+        modal.style.display = "flex";
+    }
+    span.onclick = function() {
+        modal.style.display = "none";
+    }
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    // Draggable Legend Logic
+    var legend = document.getElementById('legend-container');
+    var isDragging = false;
+    var offset = { x: 0, y: 0 };
+
+    legend.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        offset.x = e.clientX - legend.getBoundingClientRect().left;
+        offset.y = e.clientY - legend.getBoundingClientRect().top;
+        legend.style.cursor = 'grabbing';
+        legend.style.bottom = 'auto'; // Fix bounding box expansion
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        legend.style.left = (e.clientX - offset.x) + 'px';
+        legend.style.top = (e.clientY - offset.y) + 'px';
+        legend.style.transform = 'none'; // Remove initial transform
+    });
+
+    document.addEventListener('mouseup', function() {
+        isDragging = false;
+        legend.style.cursor = 'move';
+    });
+
+    // 1. Initialize Map
+    var map = L.map('map').setView([50, 10], 4);
+
+    // 2. Add MapTiler Dark Basemap
+    L.tileLayer('https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=V8T5C0OEZn3AMZ8Qkx4B', {
+        attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+        maxZoom: 20
+    }).addTo(map);
+
+    // 3. Risk classification (Blue Intensity)
+    function getRiskColor(risk) {
+        // 1: Low, 2: Moderate, 3: High, 4: Lost/Very High
+        switch (risk) {
+            case 1: return '#34c5a7'; // Low Risk
+            case 2: return '#D6B36A'; // Moderate Risk
+            case 3: return '#b12f4a'; // High Risk
+            case 4: return '#2A2F3A'; // Lost / Very High Risk
+            default: return '#808080'; // Grey for unknown
+        }
+    }
+
+    function getRiskLabel(risk) {
+        switch (risk) {
+            case 1: return 'Low Risk';
+            case 2: return 'Moderate Risk';
+            case 3: return 'High Risk';
+            case 4: return 'Lost / Very High Risk';
+            default: return 'Unknown';
+        }
+    }
+
+    // Point Icon Generator
+    function createPointIcon(color) {
+        return L.divIcon({
+            className: 'flow-point',
+            html: `<div style="width: 6px; height: 6px; background-color: ${color}; border-radius: 50%; box-shadow: 0 0 8px ${color}, 0 0 12px ${color};"></div>`,
+            iconSize: [6, 6],
+            iconAnchor: [3, 3]
+        });
+    }
+
+    // 4. Array to store markers for animation
+    var animatedMarkers = [];
+ // Store original positions for oscillation
+  var originalPositions = [];
+    // 5. Load JSON file (points)
+    fetch('points_salmon_data.json')
+    .then(res => res.json())
+    .then(data => {
+
+        // ESRI JSON stores points in data.features
+        var features = data.features;
+
+        features.forEach(function(f) {
+
+        var lat = f.attributes.Latitude_Decimal;
+        var lng = f.attributes.Longitude_Decimal;
+        var risk = Number(f.attributes.Risk_score_new);
+
+        if (risk === 0 || isNaN(risk)) return; // Remove unknown category
+
+        // Use Point Icon
+        var marker = L.marker([lat, lng], {
+            icon: createPointIcon(getRiskColor(risk))
+        }).addTo(map);
+
+        marker.bindPopup(`<b>River:</b> ${f.attributes.RiverName}<br><b>Risk level:</b> ${risk} (${getRiskLabel(risk)})`);
+        
+        // Animation properties
+        marker.animationProps = {
+            angle: Math.random() * 2 * Math.PI, // Random direction
+            speed: 0.01 + Math.random() * 0.05, // Distance to travel
+            duration: 2000 + Math.random() * 2000, // 2-4 seconds
+            startTime: Date.now() - Math.random() * 4000
+        };
+
+        animatedMarkers.push(marker);
+         originalPositions.push({lat: lat, lng: lng}); // save original position
+        });
+
+        // Zoom to all points
+        var group = new L.featureGroup(animatedMarkers);
+        map.fitBounds(group.getBounds());
+
+       
+      // Start animation
+      animateMarkers();
+
+    })
+    .catch(err => console.error('JSON loading error:', err));
+
+  // 6. Flow animation
+  function animateMarkers() {
+    var now = Date.now();
+
+    animatedMarkers.forEach((marker, i) => {
+      var orig = originalPositions[i];
+      var props = marker.animationProps;
+
+      var elapsed = now - props.startTime;
+      var progress = (elapsed % props.duration) / props.duration;
+
+      // Fade out
+      marker.setOpacity(1 - progress);
+
+      // Movement with wavy path
+      var dist = props.speed * progress;
+      var wave = Math.sin(progress * Math.PI * 4) * 0.005; // Wavy component
+
+      var dx = Math.cos(props.angle) * dist - Math.sin(props.angle) * wave;
+      var dy = Math.sin(props.angle) * dist + Math.cos(props.angle) * wave;
+
+      marker.setLatLng([orig.lat + dy, orig.lng + dx]);
+    });
+
+    requestAnimationFrame(animateMarkers);
+  }
+
+    </script>
+
+
+
+</body>
+</html>
